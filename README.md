@@ -225,7 +225,7 @@ Built by **LMG Soluzioni Digitali** — digital products for the Italian wellnes
 
 Part of the *Ecosistemi Digitali e Notion Aesthetic* product line.
 
-📧 For licensing or inquiries, visit our website.
+📧 For licensing or inquiries, visit my website lmgsoluzionidigitali.it
 
 ---
 
