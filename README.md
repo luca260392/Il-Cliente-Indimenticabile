@@ -1,8 +1,6 @@
 # Il Cliente Indimenticabile
 
-**Privacy-first CRM desktop app for wellness professionals who work 1-to-1 with clients.**
-
-> Built for coaches, therapists, yoga teachers, and personal trainers who manage 15–50 recurring clients and need a fast, offline tool to track sessions, automate follow-ups, and never forget a detail.
+**Privacy-first CRM desktop app per professioniste del benessere — offline-first, no cloud, no subscription.**
 
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-blue)
 ![Stack](https://img.shields.io/badge/stack-Electron%20%2B%20React%20%2B%20Express%20%2B%20SQLite-purple)
@@ -11,222 +9,180 @@
 
 ---
 
-## The Problem
+## Overview
 
-Wellness professionals juggle client notes across WhatsApp chats, Google Docs, paper notebooks, and memory. Follow-ups get forgotten. Patterns go unnoticed. Existing CRMs are cloud-based, subscription-heavy, and built for sales teams — not for someone who needs to remember that *Marta always struggles with work-life balance after holiday breaks*.
-
-## The Solution
-
-A **single desktop application** that lives on the coach's computer. No cloud. No subscription. No data leaving the machine. Just a clean, Notion-inspired interface where every client interaction is captured in under 5 minutes.
+CRM desktop distribuito come installer (`.exe` / `.dmg`) per coach, terapeute, yoga teacher e personal trainer che gestiscono 15–50 clienti ricorrenti in sessioni 1-to-1. Tutta la logica applicativa gira in locale: Express su `localhost:3001`, database SQLite in `userData`, nessuna richiesta in uscita eccetto invio comunicazioni (mailto/wa.me/SMTP).
 
 ---
 
-## Core Features
-
-| Feature | Description |
-|---------|-------------|
-| **Client Profiles** | Rich profiles with personal triggers, communication preferences, goals, and status tracking |
-| **Session Recording** | Post-session notes in ~5 min: mood tracking (1-10), topics, breakthroughs, assigned tasks |
-| **Smart Follow-ups** | Automated desktop notifications when follow-ups are due (configurable delay, default 48h) |
-| **Communication Hub** | Send pre-compiled messages via Email (SMTP/mailto) or WhatsApp with merge fields (`{nome}`, `{tema}`, `{compito}`) |
-| **Analytics** | Mood trend graphs, tag frequency analysis, automatic pattern recognition per client |
-| **Calendar** | Weekly availability slots, monthly/weekly views, .ical export to Google/Apple/Outlook |
-| **PDF Reports** | Exportable client progress reports (last 10 sessions + mood graphs) |
-| **Auto-save Drafts** | Session forms auto-save to localStorage — no data loss on accidental close |
-| **Guided Onboarding** | 4-step wizard: profession → client count → import first clients → set availability |
-
----
-
-## Tech Stack
-
-### Architecture
-
-```
+## Architettura
 ┌─────────────────────────────────────────────────┐
-│              COACH'S COMPUTER                    │
-│                                                  │
-│   Electron Shell (window, menus, notifications)  │
-│        │                                         │
-│        ▼                                         │
-│   React SPA ──HTTP──▶ Express API                │
-│   (port 5173)         (port 3001)                │
-│                           │                      │
-│                           ▼                      │
-│                    SQLite Database                │
-│                   (local file only)               │
-│                                                  │
-│   External (via shell):                          │
-│   • mailto: → default email client               │
-│   • wa.me/  → WhatsApp                          │
-│   • SMTP    → email provider (optional)          │
+│ COMPUTER UTENTE │
+│ │
+│ Electron 33 (shell, IPC, notifiche native) │
+│ │ │
+│ ▼ │
+│ React SPA ──HTTP──▶ Express API │
+│ (Vite, port 5173) (port 3001) │
+│ │ │
+│ ▼ │
+│ SQLite (better-sqlite3) │
+│ app.getPath('userData')/db.sqlite │
+│ │
+│ Comunicazioni esterne (solo su richiesta): │
+│ - mailto: → client email di sistema │
+│ - wa.me/ → WhatsApp Desktop o Web │
+│ - SMTP → Nodemailer (credenziali locali) │
 └─────────────────────────────────────────────────┘
-```
+
+
+### Principi chiave
+- **Single-user by design** — un'installazione = una coach, zero multi-tenancy
+- **Nessun server remoto** — Express è un processo figlio di Electron, mai esposto a internet
+- **IPC hardened** — `contextIsolation: true`, `nodeIntegration: false`, whitelist esplicita in `preload.js`
+- **Comunicazioni manuali** — l'app prepara i messaggi, l'utente li invia; nessun invio automatico silenzioso
+
+---
+
+## Stack
+
+### Desktop Shell
+| Tecnologia | Versione | Note |
+|-----------|---------|------|
+| Electron | 33.x | Shell cross-platform |
+| Electron Forge | 7.x | Build `.exe` (Squirrel) + `.dmg` |
+| electron-updater | 6.x | Auto-update via GitHub Releases |
 
 ### Frontend
+| Tecnologia | Versione | Note |
+|-----------|---------|------|
+| React | 18.x | SPA con React Router 6 |
+| Vite | 5.x | Build tool + HMR |
+| TailwindCSS | 3.x | Palette custom con 5 scale di colore + token semantici |
+| shadcn/ui | latest | Componenti accessibili unstyled (WCAG AA) |
+| React Query | 5.x | Server state, optimistic updates, cache invalidation |
+| Zustand | 4.x | Stato globale: auth + bozze sessione (persist) |
+| React Hook Form + Zod | 7.x + 3.x | Form + schema validation condiviso frontend/backend |
+| Recharts | 2.x | Mood trend (line) + tag frequency (bar) |
+| Framer Motion | 11.x | Skeleton loaders + transizioni pagina |
 
-| Technology | Purpose |
-|-----------|---------|
-| **React 18** | Component-based UI |
-| **Vite 5** | Build tool & HMR dev server |
-| **TailwindCSS 3** | Utility-first styling with custom Notion-inspired palette |
-| **shadcn/ui** | Accessible, unstyled component primitives |
-| **React Router 6** | Client-side routing |
-| **React Query (TanStack) 5** | Server state, caching & background sync |
-| **Zustand 4** | Lightweight global state (auth, drafts) |
-| **React Hook Form 7 + Zod 3** | Form handling with schema validation |
-| **Recharts 2** | Data visualization (mood trends, tag frequency) |
-| **Framer Motion 11** | Animations & skeleton loaders |
-| **Lucide React** | Icon system |
-
-### Backend
-
-| Technology | Purpose |
-|-----------|---------|
-| **Node.js 20 LTS** | Runtime |
-| **Express 4** | REST API with structured error handling |
-| **better-sqlite3 9** | Synchronous SQLite driver (recompiled for Electron) |
-| **JWT + bcryptjs** | Stateless authentication |
-| **node-cron 3** | Scheduled follow-up checks |
-| **Nodemailer 8** | SMTP email delivery |
-| **Helmet 7** | HTTP security headers |
-
-### Desktop
-
-| Technology | Purpose |
-|-----------|---------|
-| **Electron 33** | Cross-platform desktop shell |
-| **Electron Forge 7** | Build system → `.exe` / `.dmg` installers |
-| **electron-updater 6** | Auto-update via GitHub Releases |
-| **IPC (preload.js)** | Secure bridge between renderer and main process |
+### Backend (embedded in Electron)
+| Tecnologia | Versione | Note |
+|-----------|---------|------|
+| Node.js | 20.x LTS | Runtime |
+| Express | 4.x | REST API con error handling centralizzato |
+| better-sqlite3 | 9.x | Driver sincrono — ricompilato per Electron via `electron-rebuild` |
+| Drizzle ORM | latest | ORM type-safe + migrations |
+| bcryptjs | 2.x | Hash password (puro JS, no native addon) |
+| jsonwebtoken | 9.x | JWT stateless per auth locale |
+| node-cron | 3.x | Scheduler follow-up → notifiche native OS |
+| Nodemailer | 6.x | Invio SMTP opzionale |
+| html-pdf-node | 1.x | Export PDF report clienti (generato localmente) |
+| Helmet | 7.x | Security headers su tutte le risposte API |
 
 ---
 
-## Database Schema
+## Schema Database (SQLite)
 
-10+ relational tables in SQLite:
-
-```
+10 tabelle relazionali:
 users ─┐
-       ├──▶ clients ──▶ sessions ──▶ session_tags ──▶ tags
-       │        │
-       │        ├──▶ goals
-       │        ├──▶ communication_log
-       │        └──▶ calendar_events
-       │
-       ├──▶ calendar_slots
-       └──▶ automation_templates
+├──▶ clients ──▶ sessions ──▶ session_tags ──▶ tags
+│ │
+│ ├──▶ goals
+│ ├──▶ communication_log
+│ └──▶ calendar_events
+│
+├──▶ calendar_slots
+└──▶ automation_templates
+
+
+**Decisioni di schema rilevanti:**
+- `settings` su `users` è un campo JSON serializzato (timezone, SMTP config, notification prefs) — evita migration per ogni preferenza
+- `session_tags` many-to-many con `ON DELETE CASCADE`
+- `calendar_slots` definisce la disponibilità settimanale ricorrente (pattern), `calendar_events` le istanze concrete
+- Nessun soft delete esplicito in v1 — considerare per v2
+
+---
+
+## Sicurezza & Privacy (GDPR by design)
+
+- **Zero cloud transmission** — nessun dato lascia il filesystem locale
+- **contextIsolation + IPC whitelist** — il renderer non accede mai a Node.js direttamente
+- **bcrypt** per hash password con salt
+- **JWT** stateless — nessuna sessione lato server
+- **Helmet.js** su tutte le risposte Express
+- **Nessuna telemetria** — l'app non "telefona a casa"
+- DB salvato in `app.getPath('userData')` — mai nella cartella di installazione (che su Windows è read-only post-install)
+
+---
+
+## Decisioni Architetturali
+
+| Decisione | Razionale |
+|-----------|-----------|
+| SQLite invece di PostgreSQL | Single-user desktop — zero config, zero processo DB separato da avviare |
+| `better-sqlite3` (sync) invece di `sqlite3` (async) | Semplifica gli IPC handler Electron, evita callback hell e race conditions |
+| Express embedded invece di Electron IPC puro | Separa il data layer dall'UI; il server potrebbe essere estratto in futuro senza refactor massiccio |
+| Zustand invece di Redux | Superficie di stato globale ridotta (auth + draft) — Redux sarebbe over-engineered |
+| Nessun TypeScript in v1 | Trade-off velocità per MVP; Zod compensa la type safety a runtime sui boundary API |
+| React Query per server state | Cache automatica, background refetch, optimistic updates — elimina il boilerplate di loading/error manual |
+
+---
+
+## Pattern Critici (da rispettare)
+
+**1. Ricompila `better-sqlite3` per Electron**
+```js
+// forge.config.js
+hooks: {
+  packageAfterPrune: async (config, buildPath) => {
+    execSync('electron-rebuild -f -w better-sqlite3', { cwd: buildPath })
+  }
+}
+```
+Senza questo l'app crasha silenziosamente all'avvio su Windows.
+
+**2. Unico punto di connessione DB**
+Tutta l'app passa per `server/config/database.js`. Mai connessioni dirette altrove.
+
+**3. Zod schema condiviso**
+Stesse validazioni importate sia nelle route Express che nei form React. Zero discrepanze frontend/backend.
+
+**4. Response shape uniforme**
+```js
+// Sempre e comunque:
+{ success: true, data: {...} }
+{ success: false, error: "Messaggio", code: 400 }
 ```
 
-Key design decisions:
-- **Single-user architecture** — one coach per installation, no multi-tenancy overhead
-- **Soft deletes** — client data is never permanently lost by accident
-- **Denormalized analytics** — pre-computed mood averages for fast dashboard rendering
+**5. Query keys centralizzate**
+Tutti i React Query keys in `client/src/lib/queryKeys.js` — evita cache stale dopo mutations.
+
+**6. Auto-save bozza con Zustand persist**
+`clearDraft()` chiamato SOLO dopo conferma di salvataggio avvenuto. L'utente non perde mai una sessione compilata a metà.
 
 ---
 
-## Security & Privacy
-
-This application was designed with **GDPR compliance** as a first-class concern:
-
-- **Zero cloud transmission** — all data stays on the local filesystem
-- **Electron security hardening** — `contextIsolation: true`, `nodeIntegration: false`, whitelisted IPC channels only
-- **Password hashing** — bcrypt with salt rounds
-- **JWT auth** — stateless tokens, no session storage on server
-- **Helmet.js** — security headers on all API responses
-- **No telemetry** — the app does not phone home
-
----
-
-## Project Structure
-
-```
-├── electron/               # Desktop shell & IPC handlers
-│   ├── main.js             # Window creation, server bootstrap
-│   ├── preload.js          # Secure IPC bridge
-│   ├── forge.config.js     # Build configuration
-│   └── ipc/                # Handler modules (backup, PDF, comms)
-│
-├── server/                 # Express REST API
-│   ├── routes/             # Endpoint definitions
-│   ├── controllers/        # Request handlers
-│   ├── services/           # Business logic & DB queries
-│   ├── middleware/          # Auth, validation, error handling
-│   ├── config/             # Constants, DB connection, SMTP
-│   └── database/           # Schema & migrations
-│
-├── client/                 # React SPA
-│   └── src/
-│       ├── pages/          # Full-page views
-│       ├── components/     # Domain-organized UI components
-│       ├── hooks/          # React Query data hooks
-│       ├── store/          # Zustand stores
-│       ├── lib/            # API client, utilities, query keys
-│       └── styles/         # Global CSS & design tokens
-│
-└── data/                   # SQLite database (created at first run)
-```
-
----
-
-## Design System
-
-Custom Notion-inspired palette optimized for long working sessions:
-
-| Token | Hex | Usage |
-|-------|-----|-------|
-| Powder Blush | `#FF6B6B` | Primary actions, CTAs |
-| Eggshell | `#F5DEB3` | Warm backgrounds, cards |
-| Icy Aqua | `#00D9D9` | Success states, positive mood |
-| Light Blue | `#D0E8F2` | Sidebar, secondary surfaces |
-| Blue Slate | `#475569` | Text, borders, icons |
-
----
-
-## Key Engineering Decisions
-
-| Decision | Rationale |
-|----------|-----------|
-| **SQLite over PostgreSQL** | Single-user desktop app — no need for a database server. Simpler deployment, zero configuration |
-| **better-sqlite3 (sync) over sqlite3 (async)** | Synchronous API simplifies Electron IPC handlers and avoids callback nesting |
-| **Zustand over Redux** | Minimal boilerplate for a small global state surface (auth + draft) |
-| **React Query for server state** | Automatic cache invalidation, background refetch, optimistic updates — eliminates manual loading/error state management |
-| **Express embedded in Electron** | Decouples frontend from data layer. Could be extracted to a standalone server if needed in the future |
-| **No TypeScript (v1)** | Velocity trade-off for MVP. Zod schemas provide runtime type safety at API boundaries |
-
----
-
-## Distribution
-
-| Platform | Format | Build Tool |
-|----------|--------|-----------|
-| Windows | `.exe` installer | Electron Forge (Squirrel) |
-| macOS | `.dmg` installer | Electron Forge (DMG) |
-
-Auto-updates supported via `electron-updater` connected to GitHub Releases.
+## Struttura Progetto
+├── electron/ # Main process, preload, IPC handlers, forge config
+├── server/ # Express API (routes → controllers → services → DB)
+│ ├── routes/
+│ ├── controllers/
+│ ├── services/ # Business logic
+│ ├── middleware/ # Auth, validation, error handling
+│ └── database/ # Schema Drizzle + migrations SQL
+├── client/src/
+│ ├── pages/ # Viste full-page
+│ ├── components/ # Componenti per dominio (clients, sessions, calendar…)
+│ ├── hooks/ # React Query hooks per dominio
+│ ├── store/ # Zustand (auth, ui, draft)
+│ └── lib/ # api.js, queryKeys.js, utils, electron bridge
+└── data/ # .gitkeep — il .sqlite viene creato a runtime
 
 ---
 
 ## Status
 
-This is a **commercial product** — source code is not open source.
+Prodotto commerciale — source code non open source. Questo repository è un **portfolio showcase** dell'architettura e delle scelte ingegneristiche.
 
-This repository serves as a **technical portfolio showcase** demonstrating:
-- Full-stack desktop application architecture
-- Electron + React + Express integration patterns
-- Offline-first data management with SQLite
-- Privacy-by-design engineering
-- Production-grade project structure and security practices
-
----
-
-## About
-
-Built by **LMG Soluzioni Digitali** — digital products for the Italian wellness market.
-
-Part of the *Ecosistemi Digitali e Notion Aesthetic* product line.
-
-📧 For licensing or inquiries, visit my website lmgsoluzionidigitali.it
-
----
-
-<sub>Built with Electron · React · Express · SQLite · TailwindCSS · shadcn/ui</sub>
+Costruito da **LMG Soluzioni Digitali** - https://lmgsoluzionidigitali.it/
